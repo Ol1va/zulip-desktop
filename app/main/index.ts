@@ -41,6 +41,8 @@ sentryInit();
 
 let mainWindowState: windowStateKeeper.State;
 
+let mainWindow: BrowserWindow | undefined;
+
 let badgeCount: number;
 
 let isQuitting = false;
@@ -173,7 +175,7 @@ function createMainWindow(): BrowserWindow {
   // Register zulip:// protocol for deep links
   if (process.platform === "win32" && process.defaultApp) {
     app.setAsDefaultProtocolClient("zulip", process.execPath, [
-      path.resolve(process.argv[1]),
+      path.resolve(process.argv[1] ?? ""),
     ]);
   } else {
     app.setAsDefaultProtocolClient("zulip");
@@ -208,7 +210,7 @@ function createMainWindow(): BrowserWindow {
       }
     }
 
-    mainWindow.show();
+    mainWindow?.show();
   });
 
   ipcMain.on(
@@ -221,7 +223,7 @@ function createMainWindow(): BrowserWindow {
 
   // This event is only available on macOS. Triggers when you click on the dock icon.
   app.on("activate", () => {
-    mainWindow.show();
+    mainWindow?.show();
   });
 
   app.on("web-contents-created", (_event, contents: WebContents) => {
@@ -289,7 +291,7 @@ function createMainWindow(): BrowserWindow {
   AppMenu.setMenu({
     tabs: [],
   });
-  const mainWindow = createMainWindow();
+  mainWindow = createMainWindow();
 
   // Auto-hide menu bar on Windows + Linux
   if (process.platform !== "darwin") {
@@ -302,9 +304,9 @@ function createMainWindow(): BrowserWindow {
 
   page.on("dom-ready", () => {
     if (ConfigUtil.getConfigItem("startMinimized", false)) {
-      mainWindow.hide();
+      mainWindow?.hide();
     } else {
-      mainWindow.show();
+      mainWindow?.show();
     }
   });
 
@@ -380,7 +382,7 @@ function createMainWindow(): BrowserWindow {
         "permission-request",
         {
           webContentsId:
-            sourceWebContents.id === mainWindow.webContents.id
+            sourceWebContents.id === mainWindow?.webContents.id
               ? null
               : sourceWebContents.id,
           origin,
@@ -398,7 +400,7 @@ function createMainWindow(): BrowserWindow {
   // });
 
   ipcMain.on("focus-app", () => {
-    mainWindow.show();
+    mainWindow?.show();
   });
 
   ipcMain.on("quit-app", () => {
@@ -407,7 +409,7 @@ function createMainWindow(): BrowserWindow {
 
   // Reload full app not just webview, useful in debugging
   ipcMain.on("reload-full-app", () => {
-    mainWindow.reload();
+    mainWindow?.reload();
     send(page, "destroytray");
   });
 
@@ -418,31 +420,33 @@ function createMainWindow(): BrowserWindow {
   });
 
   ipcMain.on("toggle-app", () => {
-    if (!mainWindow.isVisible() || mainWindow.isMinimized()) {
-      mainWindow.show();
+    if (!mainWindow?.isVisible() || mainWindow?.isMinimized()) {
+      mainWindow?.show();
     } else {
-      mainWindow.hide();
+      mainWindow?.hide();
     }
   });
 
   ipcMain.on("toggle-badge-option", () => {
-    BadgeSettings.updateBadge(badgeCount, mainWindow);
+    mainWindow && BadgeSettings.updateBadge(badgeCount, mainWindow);
   });
 
   ipcMain.on("toggle-menubar", (_event, showMenubar: boolean) => {
-    mainWindow.autoHideMenuBar = showMenubar;
-    mainWindow.setMenuBarVisibility(!showMenubar);
-    send(page, "toggle-autohide-menubar", showMenubar, true);
+    if (mainWindow) {
+      mainWindow.autoHideMenuBar = showMenubar;
+      mainWindow.setMenuBarVisibility(!showMenubar);
+      send(page, "toggle-autohide-menubar", showMenubar, true);
+    }
   });
 
   ipcMain.on("update-badge", (_event, messageCount: number) => {
     badgeCount = messageCount;
-    BadgeSettings.updateBadge(badgeCount, mainWindow);
+    mainWindow && BadgeSettings.updateBadge(badgeCount, mainWindow);
     send(page, "tray", messageCount);
   });
 
   ipcMain.on("update-taskbar-icon", (_event, data: string, text: string) => {
-    BadgeSettings.updateTaskbarIcon(data, text, mainWindow);
+    mainWindow && BadgeSettings.updateTaskbarIcon(data, text, mainWindow);
   });
 
   ipcMain.on(
@@ -478,7 +482,7 @@ function createMainWindow(): BrowserWindow {
       properties.activeTabIndex !== undefined &&
       (activeTab = properties.tabs[properties.activeTabIndex]) !== undefined
     ) {
-      mainWindow.setTitle(`Zulip - ${activeTab.label}`);
+      mainWindow && mainWindow.setTitle(`Zulip - ${activeTab.label}`);
     }
   });
 
@@ -506,7 +510,7 @@ function createMainWindow(): BrowserWindow {
 
   ipcMain.on("focus-this-webview", (event) => {
     send(page, "focus-webview-with-id", event.sender.id);
-    mainWindow.show();
+    mainWindow?.show();
   });
 
   // Update user idle status for each realm after every 15s

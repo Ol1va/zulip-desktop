@@ -743,13 +743,14 @@ export class ServerManagerView {
     if (index === -1) {
       await this.openSettings("AddServer");
     } else {
-      await this.activateLastTab(index);
+      if (this.activeTabIndex !== index) {
+        await this.activateLastTab(index);
+      }
 
       const tab = this.tabs[index];
       if (tab instanceof ServerTab) {
         const webview = await tab.webview;
-
-        void webview.getWebContents().loadURL(fullUrl);
+        await webview.navigateTo(fullUrl);
       }
     }
   }
